@@ -93,7 +93,3 @@ npm run preview
 | `/api/stop/{id}` | POST | 停止任务 |
 | `/api/tasks` | GET | 获取任务列表 |
 | `/api/delete/{id}` | DELETE | 删除任务 |
-
-## 许可证
-
-Apache License 2.0
