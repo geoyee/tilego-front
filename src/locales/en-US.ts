@@ -66,6 +66,7 @@ export default {
     delete: "Delete",
     refresh: "Refresh",
     noTasks: "No tasks",
+    loading: "Loading...",
     statusPending: "Pending",
     statusRunning: "Running",
     statusStopped: "Stopped",
@@ -88,6 +89,8 @@ export default {
     templateNameRequired: "Please enter template name",
     selectTemplate: "Select template",
     clearTemplates: "Clear All Templates",
+    connected: "Connected",
+    disconnected: "Disconnected",
   },
   message: {
     taskCreated: "Task created successfully",

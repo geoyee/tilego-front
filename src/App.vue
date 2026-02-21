@@ -11,7 +11,9 @@ import { Draw } from "ol/interaction";
 import { fromExtent } from "ol/geom/Polygon";
 import { transformExtent, transform } from "ol/proj";
 import type { Feature } from "ol";
-import type { Geometry } from "ol/geom";
+import type { Geometry, SimpleGeometry } from "ol/geom";
+import type { Extent } from "ol/extent";
+import type { Coordinate } from "ol/coordinate";
 import {
   useMapStore,
   useSettingsStore,
@@ -136,11 +138,13 @@ const { t, locale } = useI18n();
 const mapContainer = ref<HTMLElement | null>(null);
 const map = ref<Map | null>(null);
 const drawInteraction = ref<Draw | null>(null);
-const vectorSource = ref<VectorSource>(new VectorSource());
-const vectorLayer = ref<VectorLayer<VectorSource> | null>(null);
+const vectorSource = ref<VectorSource<Feature<Geometry>>>(new VectorSource());
+const vectorLayer = ref<VectorLayer<VectorSource<Feature<Geometry>>> | null>(
+  null,
+);
 const isDrawing = ref(false);
 
-const activeTab = ref<"download" | "settings">("download");
+const activeTab = ref<"download" | "tasks" | "settings">("download");
 const sidebarCollapsed = ref(false);
 
 const templates = ref<UrlTemplate[]>([]);
@@ -218,17 +222,19 @@ const startDrawing = () => {
   drawInteraction.value = new Draw({
     source: vectorSource.value,
     type: "Circle",
-    geometryFunction: (coordinates, geometry) => {
-      if (!geometry) {
-        geometry = fromExtent([0, 0, 0, 0]) as unknown as Geometry;
+    geometryFunction: (coordinates, geometryParam) => {
+      const coords = coordinates as Coordinate[];
+      let geom = geometryParam as SimpleGeometry | null;
+      if (!geom) {
+        geom = fromExtent([0, 0, 0, 0]);
       }
-      const extent = [
-        Math.min(coordinates[0][0], coordinates[1][0]),
-        Math.min(coordinates[0][1], coordinates[1][1]),
-        Math.max(coordinates[0][0], coordinates[1][0]),
-        Math.max(coordinates[0][1], coordinates[1][1]),
+      const extent: Extent = [
+        Math.min(coords[0][0], coords[1][0]),
+        Math.min(coords[0][1], coords[1][1]),
+        Math.max(coords[0][0], coords[1][0]),
+        Math.max(coords[0][1], coords[1][1]),
       ];
-      geometry.setCoordinates([
+      geom.setCoordinates([
         [
           extent.slice(0, 2),
           [extent[2], extent[1]],
@@ -237,7 +243,7 @@ const startDrawing = () => {
           extent.slice(0, 2),
         ],
       ]);
-      return geometry;
+      return geom;
     },
   });
 
@@ -248,7 +254,7 @@ const startDrawing = () => {
       const transformedExtent = transformExtent(
         extent,
         "EPSG:3857",
-        "EPSG:4326"
+        "EPSG:4326",
       );
 
       const box: BoundingBox = {
@@ -310,21 +316,23 @@ const loadFile = async () => {
       vectorSource.value.addFeatures(features);
 
       const extent = vectorSource.value.getExtent();
-      const transformedExtent = transformExtent(
-        extent,
-        "EPSG:3857",
-        "EPSG:4326"
-      );
+      if (extent) {
+        const transformedExtent = transformExtent(
+          extent,
+          "EPSG:3857",
+          "EPSG:4326",
+        );
 
-      const box: BoundingBox = {
-        minLon: parseFloat(transformedExtent[0].toFixed(6)),
-        minLat: parseFloat(transformedExtent[1].toFixed(6)),
-        maxLon: parseFloat(transformedExtent[2].toFixed(6)),
-        maxLat: parseFloat(transformedExtent[3].toFixed(6)),
-      };
+        const box: BoundingBox = {
+          minLon: parseFloat(transformedExtent[0].toFixed(6)),
+          minLat: parseFloat(transformedExtent[1].toFixed(6)),
+          maxLon: parseFloat(transformedExtent[2].toFixed(6)),
+          maxLat: parseFloat(transformedExtent[3].toFixed(6)),
+        };
 
-      mapStore.setBoundingBox(box);
-      map.value?.getView().fit(extent, { padding: [50, 50, 50, 50] });
+        mapStore.setBoundingBox(box);
+        map.value?.getView().fit(extent, { padding: [50, 50, 50, 50] });
+      }
       ElMessage.success(t("message.fileLoadSuccess"));
     } else {
       ElMessage.error(t("message.fileLoadFailed"));
@@ -356,21 +364,21 @@ const estimatedTiles = computed(() => {
       ((1 -
         Math.log(
           Math.tan((box.maxLat * Math.PI) / 180) +
-            1 / Math.cos((box.maxLat * Math.PI) / 180)
+            1 / Math.cos((box.maxLat * Math.PI) / 180),
         ) /
           Math.PI) /
         2) *
-        n
+        n,
     );
     const maxY = Math.floor(
       ((1 -
         Math.log(
           Math.tan((box.minLat * Math.PI) / 180) +
-            1 / Math.cos((box.minLat * Math.PI) / 180)
+            1 / Math.cos((box.minLat * Math.PI) / 180),
         ) /
           Math.PI) /
         2) *
-        n
+        n,
     );
 
     total += (maxX - minX + 1) * (maxY - minY + 1);
@@ -438,7 +446,6 @@ const startDownload = async () => {
 
 const loadTemplates = async () => {
   const savedTemplates = await getAllTemplates();
-  const savedIds = new Set(savedTemplates.map((t) => t.id));
   const combined = [
     ...DEFAULT_TEMPLATES,
     ...savedTemplates.filter((t) => !t.id.startsWith("default-")),
@@ -453,7 +460,7 @@ const handleSaveTemplate = async () => {
   }
   if (!newTemplateName.value.trim()) {
     ElMessage.warning(
-      t("settings.templateNameRequired") || "Please enter template name"
+      t("settings.templateNameRequired") || "Please enter template name",
     );
     return;
   }
@@ -482,7 +489,7 @@ const handleSelectTemplate = (id: string) => {
 const handleDeleteTemplate = async (id: string) => {
   if (id.startsWith("default-")) {
     ElMessage.warning(
-      t("message.cannotDeleteDefault") || "Cannot delete default template"
+      t("message.cannotDeleteDefault") || "Cannot delete default template",
     );
     return;
   }
@@ -527,9 +534,9 @@ const handleLocaleChange = (lang: "zh-CN" | "en-US") => {
   appStore.setAppLocale(lang);
 };
 
-const handleSaveApiUrl = () => {
+const handleSaveApiUrl = async () => {
   appStore.setApiBaseUrl(apiBaseUrl.value);
-  ElMessage.success(t("message.settingsSaved"));
+  await appStore.checkBackendConnection();
 };
 
 const boundingBox = computed(() => mapStore.boundingBox);
@@ -540,12 +547,13 @@ watch(selectedTemplateId, (id) => {
   }
 });
 
-onMounted(() => {
+onMounted(async () => {
   initMap();
   loadTemplates();
   loadSavedSettings();
   appStore.initTheme();
   apiBaseUrl.value = appStore.apiBaseUrl;
+  await appStore.checkBackendConnection();
 });
 
 onUnmounted(() => {
@@ -579,13 +587,52 @@ const loadSavedSettings = () => {
   batchSize.value = params.batch_size ?? 1000;
   bufferSize.value = params.buffer_size ?? 8192;
 };
+
+const getTaskStatusType = (
+  status: string,
+): "success" | "warning" | "info" | "danger" | "" => {
+  const statusMap: Record<
+    string,
+    "success" | "warning" | "info" | "danger" | ""
+  > = {
+    pending: "info",
+    running: "warning",
+    stopped: "danger",
+    complete: "success",
+    failed: "danger",
+  };
+  return statusMap[status] || "info";
+};
+
+const capitalize = (str: string): string => {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
+const formatSpeed = (bytesPerSecond: number): string => {
+  if (bytesPerSecond < 1024) {
+    return `${bytesPerSecond} B/s`;
+  } else if (bytesPerSecond < 1024 * 1024) {
+    return `${(bytesPerSecond / 1024).toFixed(2)} KB/s`;
+  } else {
+    return `${(bytesPerSecond / (1024 * 1024)).toFixed(2)} MB/s`;
+  }
+};
+
+const selectFolder = async () => {
+  try {
+    const dirHandle = await window.showDirectoryPicker();
+    saveDir.value = dirHandle.name;
+  } catch {
+    // User cancelled or browser doesn't support
+  }
+};
 </script>
 
 <template>
   <div class="main-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
     <aside class="sidebar">
       <div class="sidebar-header">
-        <span v-if="sidebarCollapsed" class="sidebar-title"></span>
+        <span v-if="sidebarCollapsed" class="sidebar-title">TileGo</span>
         <span v-else class="sidebar-title-expanded">TileGo</span>
         <el-button
           :icon="sidebarCollapsed ? 'Expand' : 'Fold'"
@@ -720,11 +767,17 @@ const loadSavedSettings = () => {
 
               <div class="panel-section">
                 <div class="section-label">{{ t("download.saveDir") }}</div>
-                <el-input
-                  v-model="saveDir"
-                  :placeholder="t('download.saveDirPlaceholder')"
-                  size="small"
-                />
+                <div class="save-dir-row">
+                  <el-input
+                    v-model="saveDir"
+                    :placeholder="t('download.saveDirPlaceholder')"
+                    size="small"
+                    style="flex: 1"
+                  />
+                  <el-button size="small" @click="selectFolder">
+                    <el-icon><Folder /></el-icon>
+                  </el-button>
+                </div>
               </div>
 
               <div class="panel-section">
@@ -790,6 +843,7 @@ const loadSavedSettings = () => {
                       :placeholder="t('download.proxyUrlPlaceholder')"
                       size="small"
                     />
+                    <div class="adv-hint">{{ t("download.proxyUrlHint") }}</div>
                   </div>
                   <div class="adv-checkboxes">
                     <el-checkbox v-model="skipExisting" size="small">{{
@@ -812,6 +866,90 @@ const loadSavedSettings = () => {
                   <el-icon><Download /></el-icon>
                   {{ t("download.startDownload") }}
                 </el-button>
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane name="tasks" :label="t('nav.tasks')">
+              <div class="panel-section">
+                <div class="task-header">
+                  <span class="section-label">{{ t("task.title") }}</span>
+                  <el-button size="small" @click="taskStore.fetchTasks">
+                    <el-icon><Refresh /></el-icon>
+                  </el-button>
+                </div>
+              </div>
+
+              <div v-if="taskStore.loading" class="task-loading">
+                <el-icon class="is-loading"><Loading /></el-icon>
+                <span>{{ t("task.loading") || "Loading..." }}</span>
+              </div>
+
+              <div v-else-if="taskStore.tasks.length === 0" class="task-empty">
+                {{ t("task.noTasks") }}
+              </div>
+
+              <div v-else class="task-list">
+                <div
+                  v-for="task in taskStore.tasks"
+                  :key="task.id"
+                  class="task-item"
+                >
+                  <div class="task-header-row">
+                    <span class="task-id">{{ task.id.slice(0, 8) }}</span>
+                    <el-tag :type="getTaskStatusType(task.status)" size="small">
+                      {{ t(`task.status${capitalize(task.status)}`) }}
+                    </el-tag>
+                  </div>
+                  <div class="task-progress">
+                    <el-progress
+                      :percentage="
+                        task.total > 0
+                          ? Math.round((task.progress / task.total) * 100)
+                          : 0
+                      "
+                      :status="
+                        task.status === 'complete'
+                          ? 'success'
+                          : task.status === 'failed'
+                            ? 'exception'
+                            : ''
+                      "
+                      :stroke-width="6"
+                    />
+                  </div>
+                  <div class="task-stats">
+                    <span
+                      >{{ t("task.progress") }}: {{ task.progress }}/{{
+                        task.total
+                      }}</span
+                    >
+                    <span>{{ t("task.success") }}: {{ task.success }}</span>
+                    <span>{{ t("task.failed") }}: {{ task.failed }}</span>
+                    <span>{{ t("task.skipped") }}: {{ task.skipped }}</span>
+                  </div>
+                  <div v-if="task.speed > 0" class="task-speed">
+                    {{ t("task.speed") }}: {{ formatSpeed(task.speed) }}
+                  </div>
+                  <div class="task-actions">
+                    <el-button
+                      v-if="task.status === 'running'"
+                      type="warning"
+                      size="small"
+                      @click="taskStore.stopTaskAction(task.id)"
+                    >
+                      <el-icon><VideoPause /></el-icon>
+                      {{ t("task.stop") }}
+                    </el-button>
+                    <el-button
+                      type="danger"
+                      size="small"
+                      @click="taskStore.deleteTaskAction(task.id)"
+                    >
+                      <el-icon><Delete /></el-icon>
+                      {{ t("task.delete") }}
+                    </el-button>
+                  </div>
+                </div>
               </div>
             </el-tab-pane>
 
@@ -862,6 +1000,23 @@ const loadSavedSettings = () => {
                 >
                   {{ t("settings.save") }}
                 </el-button>
+                <div
+                  class="connection-status"
+                  :class="{
+                    connected: appStore.backendConnected,
+                    disconnected: !appStore.backendConnected,
+                  }"
+                >
+                  <el-icon :size="12">
+                    <CircleCheck v-if="appStore.backendConnected" />
+                    <CircleClose v-else />
+                  </el-icon>
+                  <span>{{
+                    appStore.backendConnected
+                      ? t("settings.connected")
+                      : t("settings.disconnected")
+                  }}</span>
+                </div>
               </div>
 
               <div class="panel-section">
@@ -904,12 +1059,14 @@ const loadSavedSettings = () => {
   border-right: 1px solid var(--el-border-color-light);
   display: flex;
   flex-direction: column;
-  transition: width 0.3s ease, min-width 0.3s ease;
+  transition:
+    width 0.3s ease,
+    min-width 0.3s ease;
 }
 
 .main-layout.sidebar-collapsed .sidebar {
-  width: 56px;
-  min-width: 56px;
+  width: 80px;
+  min-width: 80px;
 }
 
 .sidebar-header {
@@ -922,6 +1079,8 @@ const loadSavedSettings = () => {
 }
 
 .sidebar-title {
+  font-size: 14px;
+  font-weight: 600;
   color: var(--el-text-color-primary);
 }
 
@@ -994,6 +1153,21 @@ const loadSavedSettings = () => {
 }
 
 .save-template-row .el-button {
+  min-width: 32px;
+  padding: 0 12px;
+}
+
+.save-dir-row {
+  display: flex;
+  gap: 8px;
+}
+
+.save-dir-row .el-input,
+.save-dir-row .el-button {
+  height: 32px;
+}
+
+.save-dir-row .el-button {
   min-width: 32px;
   padding: 0 12px;
 }
@@ -1169,5 +1343,103 @@ const loadSavedSettings = () => {
 
 .panel-section .el-button {
   height: 32px;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.connection-status.connected {
+  color: var(--el-color-success);
+  background: var(--el-color-success-light-9);
+}
+
+.connection-status.disconnected {
+  color: var(--el-color-danger);
+  background: var(--el-color-danger-light-9);
+}
+
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.task-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--el-text-color-secondary);
+}
+
+.task-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--el-text-color-placeholder);
+  background: var(--el-fill-color-light);
+  border-radius: 6px;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-item {
+  background: var(--el-fill-color-lighter);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.task-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.task-id {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.task-progress {
+  margin-bottom: 8px;
+}
+
+.task-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 8px;
+}
+
+.task-speed {
+  font-size: 11px;
+  color: var(--el-color-primary);
+  margin-bottom: 8px;
+}
+
+.task-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.task-actions .el-button {
+  flex: 1;
 }
 </style>

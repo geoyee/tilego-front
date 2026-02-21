@@ -82,3 +82,9 @@ export interface GeoJSON {
   features?: GeoJSONFeature[]
   geometry?: GeoJSONFeature['geometry']
 }
+
+declare global {
+  interface Window {
+    showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>
+  }
+}
