@@ -47,6 +47,8 @@ export default {
     startDownload: "Start Download",
     estimatedTiles: "Estimated Tiles",
     calculating: "Calculating...",
+    folderPathHint:
+      "Browser cannot get full path, using relative path, please modify if needed",
   },
   task: {
     title: "Task List",

@@ -47,6 +47,7 @@ export default {
     startDownload: "开始下载",
     estimatedTiles: "预计瓦片数量",
     calculating: "计算中...",
+    folderPathHint: "浏览器无法获取完整路径，已使用相对路径，请根据需要修改",
   },
   task: {
     title: "任务列表",

@@ -140,7 +140,7 @@ const map = ref<Map | null>(null);
 const drawInteraction = ref<Draw | null>(null);
 const vectorSource = ref<VectorSource<Feature<Geometry>>>(new VectorSource());
 const vectorLayer = ref<VectorLayer<VectorSource<Feature<Geometry>>> | null>(
-  null,
+  null
 );
 const isDrawing = ref(false);
 
@@ -254,7 +254,7 @@ const startDrawing = () => {
       const transformedExtent = transformExtent(
         extent,
         "EPSG:3857",
-        "EPSG:4326",
+        "EPSG:4326"
       );
 
       const box: BoundingBox = {
@@ -320,7 +320,7 @@ const loadFile = async () => {
         const transformedExtent = transformExtent(
           extent,
           "EPSG:3857",
-          "EPSG:4326",
+          "EPSG:4326"
         );
 
         const box: BoundingBox = {
@@ -364,21 +364,21 @@ const estimatedTiles = computed(() => {
       ((1 -
         Math.log(
           Math.tan((box.maxLat * Math.PI) / 180) +
-            1 / Math.cos((box.maxLat * Math.PI) / 180),
+            1 / Math.cos((box.maxLat * Math.PI) / 180)
         ) /
           Math.PI) /
         2) *
-        n,
+        n
     );
     const maxY = Math.floor(
       ((1 -
         Math.log(
           Math.tan((box.minLat * Math.PI) / 180) +
-            1 / Math.cos((box.minLat * Math.PI) / 180),
+            1 / Math.cos((box.minLat * Math.PI) / 180)
         ) /
           Math.PI) /
         2) *
-        n,
+        n
     );
 
     total += (maxX - minX + 1) * (maxY - minY + 1);
@@ -441,7 +441,10 @@ const startDownload = async () => {
     buffer_size: bufferSize.value,
   };
 
-  await taskStore.createTask(params);
+  const taskId = await taskStore.createTask(params);
+  if (taskId) {
+    startTaskPolling();
+  }
 };
 
 const loadTemplates = async () => {
@@ -460,7 +463,7 @@ const handleSaveTemplate = async () => {
   }
   if (!newTemplateName.value.trim()) {
     ElMessage.warning(
-      t("settings.templateNameRequired") || "Please enter template name",
+      t("settings.templateNameRequired") || "Please enter template name"
     );
     return;
   }
@@ -489,7 +492,7 @@ const handleSelectTemplate = (id: string) => {
 const handleDeleteTemplate = async (id: string) => {
   if (id.startsWith("default-")) {
     ElMessage.warning(
-      t("message.cannotDeleteDefault") || "Cannot delete default template",
+      t("message.cannotDeleteDefault") || "Cannot delete default template"
     );
     return;
   }
@@ -541,9 +544,36 @@ const handleSaveApiUrl = async () => {
 
 const boundingBox = computed(() => mapStore.boundingBox);
 
+let taskPollingInterval: ReturnType<typeof setInterval> | null = null;
+
+const startTaskPolling = () => {
+  if (taskPollingInterval) return;
+  taskPollingInterval = setInterval(async () => {
+    if (appStore.backendConnected) {
+      await taskStore.fetchTasks(true);
+      if (!taskStore.hasRunningTasks) {
+        stopTaskPolling();
+      }
+    }
+  }, 2000);
+};
+
+const stopTaskPolling = () => {
+  if (taskPollingInterval) {
+    clearInterval(taskPollingInterval);
+    taskPollingInterval = null;
+  }
+};
+
 watch(selectedTemplateId, (id) => {
   if (id) {
     handleSelectTemplate(id);
+  }
+});
+
+watch(activeTab, (tab) => {
+  if (tab === "tasks") {
+    taskStore.fetchTasks();
   }
 });
 
@@ -554,10 +584,15 @@ onMounted(async () => {
   appStore.initTheme();
   apiBaseUrl.value = appStore.apiBaseUrl;
   await appStore.checkBackendConnection();
+  await taskStore.fetchTasks();
+  if (taskStore.hasRunningTasks) {
+    startTaskPolling();
+  }
 });
 
 onUnmounted(() => {
   stopDrawing();
+  stopTaskPolling();
   if (map.value) {
     map.value.setTarget(undefined);
   }
@@ -589,7 +624,7 @@ const loadSavedSettings = () => {
 };
 
 const getTaskStatusType = (
-  status: string,
+  status: string
 ): "success" | "warning" | "info" | "danger" | "" => {
   const statusMap: Record<
     string,
@@ -621,7 +656,11 @@ const formatSpeed = (bytesPerSecond: number): string => {
 const selectFolder = async () => {
   try {
     const dirHandle = await window.showDirectoryPicker();
-    saveDir.value = dirHandle.name;
+    saveDir.value = `./${dirHandle.name}`;
+    ElMessage.info(
+      t("download.folderPathHint") ||
+        "Browser cannot get full path, please modify if needed"
+    );
   } catch {
     // User cancelled or browser doesn't support
   }
@@ -911,8 +950,8 @@ const selectFolder = async () => {
                         task.status === 'complete'
                           ? 'success'
                           : task.status === 'failed'
-                            ? 'exception'
-                            : ''
+                          ? 'exception'
+                          : ''
                       "
                       :stroke-width="6"
                     />
@@ -1059,9 +1098,7 @@ const selectFolder = async () => {
   border-right: 1px solid var(--el-border-color-light);
   display: flex;
   flex-direction: column;
-  transition:
-    width 0.3s ease,
-    min-width 0.3s ease;
+  transition: width 0.3s ease, min-width 0.3s ease;
 }
 
 .main-layout.sidebar-collapsed .sidebar {

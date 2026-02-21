@@ -87,8 +87,10 @@ export const useTaskStore = defineStore("task", () => {
   const loading = ref(false);
   const currentTaskId = ref<string | null>(null);
 
-  const fetchTasks = async () => {
-    loading.value = true;
+  const fetchTasks = async (silent = false) => {
+    if (!silent) {
+      loading.value = true;
+    }
     try {
       const result = await getTasks();
       if (result.success && result.data) {
@@ -97,7 +99,9 @@ export const useTaskStore = defineStore("task", () => {
     } catch (error) {
       console.error("Failed to fetch tasks:", error);
     } finally {
-      loading.value = false;
+      if (!silent) {
+        loading.value = false;
+      }
     }
   };
 
