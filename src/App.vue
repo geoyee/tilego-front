@@ -155,7 +155,7 @@ const minZoom = ref(0);
 const maxZoom = ref(18);
 const fileName = ref("tiles");
 const format = ref("zxy");
-const threads = ref(10);
+const threads = ref(5);
 const timeout = ref(60);
 const retries = ref(5);
 const proxyUrl = ref("");
@@ -705,7 +705,7 @@ const cancelTask = async (taskId: string) => {
     <aside class="sidebar">
       <div class="sidebar-header">
         <span v-if="sidebarCollapsed" class="sidebar-title"></span>
-        <span v-else class="sidebar-title-expanded">TileGo</span>
+        <span v-else class="sidebar-title-expanded">{{ t("nav.title") }}</span>
         <el-button
           :icon="sidebarCollapsed ? 'Expand' : 'Fold'"
           text
@@ -921,7 +921,6 @@ const cancelTask = async (taskId: string) => {
                       :placeholder="t('download.proxyUrlPlaceholder')"
                       size="small"
                     />
-                    <div class="adv-hint">{{ t("download.proxyUrlHint") }}</div>
                   </div>
                   <div class="adv-checkboxes">
                     <el-checkbox v-model="skipExisting" size="small">{{

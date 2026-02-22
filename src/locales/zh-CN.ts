@@ -1,5 +1,6 @@
 export default {
   nav: {
+    title: "地图瓦片下载器",
     map: "下载",
     tasks: "任务列表",
     settings: "设置",

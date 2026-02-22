@@ -1,5 +1,6 @@
 export default {
   nav: {
+    title: "Map Tile Downloader",
     map: "Download",
     tasks: "Tasks",
     settings: "Settings",
