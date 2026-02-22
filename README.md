@@ -9,8 +9,6 @@ tilego-front/
 ├── src/
 │   ├── api/                    # API 请求层
 │   ├── locales/                # 国际化语言包
-│   │   ├── zh-CN.ts            # 中文
-│   │   └── en-US.ts            # 英文
 │   ├── stores/                 # Pinia 状态管理
 │   ├── types/                  # TypeScript 类型定义
 │   ├── App.vue                 # 主应用组件
