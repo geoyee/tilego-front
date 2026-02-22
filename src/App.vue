@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from "vue";
+import { ref, shallowRef, onMounted, onUnmounted, computed, watch } from "vue";
 import Map from "ol/Map";
 import View from "ol/View";
 import TileLayer from "ol/layer/Tile";
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
 import OSM from "ol/source/OSM";
+import XYZ from "ol/source/XYZ";
 import { Style, Fill, Stroke } from "ol/style";
 import { Draw } from "ol/interaction";
 import { fromExtent } from "ol/geom/Polygon";
@@ -142,6 +143,7 @@ const vectorSource = ref<VectorSource<Feature<Geometry>>>(new VectorSource());
 const vectorLayer = ref<VectorLayer<VectorSource<Feature<Geometry>>> | null>(
   null
 );
+const tileLayer = shallowRef<TileLayer | null>(null);
 const isDrawing = ref(false);
 
 const activeTab = ref<"download" | "tasks" | "settings">("download");
@@ -171,6 +173,12 @@ const keepAlive = ref(true);
 const batchSize = ref(1000);
 const bufferSize = ref(8192);
 const apiBaseUrl = ref("http://localhost:8765");
+const baseMap = ref("amap");
+
+const baseMapOptions = [
+  { value: "amap", label: "amapBase" },
+  { value: "osm", label: "osmBase" },
+];
 
 const selectionStyle = new Style({
   fill: new Fill({
@@ -186,23 +194,43 @@ const initMap = () => {
   if (!mapContainer.value) return;
 
   vectorLayer.value = new VectorLayer({
-    source: vectorSource.value,
+    source: vectorSource.value as VectorSource,
     style: selectionStyle,
+  });
+
+  tileLayer.value = new TileLayer({
+    source:
+      baseMap.value === "amap"
+        ? new XYZ({
+            url: "https://webrd0{1-4}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+            wrapX: false,
+          })
+        : new OSM(),
   });
 
   map.value = new Map({
     target: mapContainer.value,
-    layers: [
-      new TileLayer({
-        source: new OSM(),
-      }),
-      vectorLayer.value,
-    ],
+    layers: [tileLayer.value, vectorLayer.value as VectorLayer],
     view: new View({
       center: transform([116.4, 39.9], "EPSG:4326", "EPSG:3857"),
       zoom: 5,
     }),
   });
+};
+
+const updateBaseMap = () => {
+  if (!tileLayer.value) return;
+  appStore.setBaseMap(baseMap.value);
+  if (baseMap.value === "osm") {
+    tileLayer.value.setSource(new OSM());
+  } else if (baseMap.value === "amap") {
+    tileLayer.value.setSource(
+      new XYZ({
+        url: "https://webrd0{1-4}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+        wrapX: false,
+      })
+    );
+  }
 };
 
 const toggleDraw = () => {
@@ -220,7 +248,7 @@ const startDrawing = () => {
   mapStore.clearBoundingBox();
 
   drawInteraction.value = new Draw({
-    source: vectorSource.value,
+    source: vectorSource.value as VectorSource,
     type: "Circle",
     geometryFunction: (coordinates, geometryParam) => {
       const coords = coordinates as Coordinate[];
@@ -228,11 +256,13 @@ const startDrawing = () => {
       if (!geom) {
         geom = fromExtent([0, 0, 0, 0]);
       }
+      const coord0 = coords[0] as Coordinate;
+      const coord1 = coords[1] as Coordinate;
       const extent: Extent = [
-        Math.min(coords[0][0], coords[1][0]),
-        Math.min(coords[0][1], coords[1][1]),
-        Math.max(coords[0][0], coords[1][0]),
-        Math.max(coords[0][1], coords[1][1]),
+        Math.min(coord0[0] as number, coord1[0] as number),
+        Math.min(coord0[1] as number, coord1[1] as number),
+        Math.max(coord0[0] as number, coord1[0] as number),
+        Math.max(coord0[1] as number, coord1[1] as number),
       ];
       geom.setCoordinates([
         [
@@ -258,10 +288,10 @@ const startDrawing = () => {
       );
 
       const box: BoundingBox = {
-        minLon: parseFloat(transformedExtent[0].toFixed(6)),
-        minLat: parseFloat(transformedExtent[1].toFixed(6)),
-        maxLon: parseFloat(transformedExtent[2].toFixed(6)),
-        maxLat: parseFloat(transformedExtent[3].toFixed(6)),
+        minLon: parseFloat(transformedExtent[0]?.toFixed(6) as string),
+        minLat: parseFloat(transformedExtent[1]?.toFixed(6) as string),
+        maxLon: parseFloat(transformedExtent[2]?.toFixed(6) as string),
+        maxLat: parseFloat(transformedExtent[3]?.toFixed(6) as string),
       };
 
       mapStore.setBoundingBox(box);
@@ -269,13 +299,13 @@ const startDrawing = () => {
     }
   });
 
-  map.value.addInteraction(drawInteraction.value);
+  map.value.addInteraction(drawInteraction.value as Draw);
   isDrawing.value = true;
 };
 
 const stopDrawing = () => {
   if (map.value && drawInteraction.value) {
-    map.value.removeInteraction(drawInteraction.value);
+    map.value.removeInteraction(drawInteraction.value as Draw);
     drawInteraction.value = null;
   }
   isDrawing.value = false;
@@ -324,10 +354,10 @@ const loadFile = async () => {
         );
 
         const box: BoundingBox = {
-          minLon: parseFloat(transformedExtent[0].toFixed(6)),
-          minLat: parseFloat(transformedExtent[1].toFixed(6)),
-          maxLon: parseFloat(transformedExtent[2].toFixed(6)),
-          maxLat: parseFloat(transformedExtent[3].toFixed(6)),
+          minLon: parseFloat(transformedExtent[0]?.toFixed(6) as string),
+          minLat: parseFloat(transformedExtent[1]?.toFixed(6) as string),
+          maxLon: parseFloat(transformedExtent[2]?.toFixed(6) as string),
+          maxLat: parseFloat(transformedExtent[3]?.toFixed(6) as string),
         };
 
         mapStore.setBoundingBox(box);
@@ -347,7 +377,6 @@ const loadFile = async () => {
 const formatOptions = [
   { value: "zxy", label: "Z/X/Y" },
   { value: "xyz", label: "X/Y/Z" },
-  { value: "quadkey", label: "QuadKey" },
 ];
 
 const estimatedTiles = computed(() => {
@@ -415,10 +444,7 @@ const startDownload = async () => {
   const box = mapStore.boundingBox;
 
   if (box.minLon === box.maxLon || box.minLat === box.maxLat) {
-    ElMessage.warning(
-      t("message.invalidCoordinates") ||
-        "经纬度范围无效，最小值和最大值不能相同"
-    );
+    ElMessage.warning(t("message.invalidCoordinates"));
     return;
   }
 
@@ -470,9 +496,7 @@ const handleSaveTemplate = async () => {
     return;
   }
   if (!newTemplateName.value.trim()) {
-    ElMessage.warning(
-      t("settings.templateNameRequired") || "Please enter template name"
-    );
+    ElMessage.warning(t("settings.templateNameRequired"));
     return;
   }
 
@@ -499,9 +523,7 @@ const handleSelectTemplate = (id: string) => {
 
 const handleDeleteTemplate = async (id: string) => {
   if (id.startsWith("default-")) {
-    ElMessage.warning(
-      t("message.cannotDeleteDefault") || "Cannot delete default template"
-    );
+    ElMessage.warning(t("message.cannotDeleteDefault"));
     return;
   }
   try {
@@ -586,13 +608,15 @@ watch(activeTab, (tab) => {
 });
 
 onMounted(async () => {
+  appStore.initTheme();
+  baseMap.value = appStore.baseMap;
+  apiBaseUrl.value = appStore.apiBaseUrl;
+
   initMap();
   loadTemplates();
   await appStore.loadPersistedSettings();
   await settingsStore.loadSavedParams();
   loadSavedSettings();
-  appStore.initTheme();
-  apiBaseUrl.value = appStore.apiBaseUrl;
   await appStore.checkBackendConnection();
   await taskStore.fetchTasks();
   if (taskStore.hasRunningTasks) {
@@ -711,9 +735,7 @@ const cancelTask = async (taskId: string) => {
                 <div class="section-label">{{ t("download.urlTemplate") }}</div>
                 <el-select
                   v-model="selectedTemplateId"
-                  :placeholder="
-                    t('settings.selectTemplate') || 'Select template'
-                  "
+                  :placeholder="t('settings.selectTemplate')"
                   clearable
                   style="width: 100%; margin-bottom: 8px"
                 >
@@ -746,7 +768,7 @@ const cancelTask = async (taskId: string) => {
                 <div class="save-template-row">
                   <el-input
                     v-model="newTemplateName"
-                    :placeholder="t('settings.templateName') || 'Template name'"
+                    :placeholder="t('settings.templateName')"
                     style="flex: 1"
                   />
                   <el-button type="primary" @click="handleSaveTemplate">
@@ -947,7 +969,7 @@ const cancelTask = async (taskId: string) => {
 
               <div v-if="taskStore.loading" class="task-loading">
                 <el-icon class="is-loading"><Loading /></el-icon>
-                <span>{{ t("task.loading") || "Loading..." }}</span>
+                <span>{{ t("task.loading") }}</span>
               </div>
 
               <div v-else-if="taskStore.tasks.length === 0" class="task-empty">
@@ -968,7 +990,7 @@ const cancelTask = async (taskId: string) => {
                   </div>
                   <div class="task-progress">
                     <el-progress
-                      :percentage="task.progress"
+                      :percentage="task.progress.toFixed(2)"
                       :status="
                         task.status === 'complete'
                           ? 'success'
@@ -1068,6 +1090,23 @@ const cancelTask = async (taskId: string) => {
               </div>
 
               <div class="panel-section">
+                <div class="section-label">{{ t("settings.baseMap") }}</div>
+                <el-select
+                  v-model="baseMap"
+                  size="small"
+                  style="width: 100%"
+                  @change="updateBaseMap"
+                >
+                  <el-option
+                    v-for="opt in baseMapOptions"
+                    :key="opt.value"
+                    :label="t('settings.' + opt.label)"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </div>
+
+              <div class="panel-section">
                 <div class="section-label">{{ t("settings.apiAddress") }}</div>
                 <el-input
                   v-model="apiBaseUrl"
@@ -1104,7 +1143,7 @@ const cancelTask = async (taskId: string) => {
 
               <div class="panel-section">
                 <div class="section-label">
-                  {{ t("settings.clearTemplates") || "Clear Templates" }}
+                  {{ t("settings.clearTemplates") }}
                 </div>
                 <el-button
                   type="danger"
@@ -1112,7 +1151,7 @@ const cancelTask = async (taskId: string) => {
                   style="width: 100%"
                 >
                   <el-icon><Delete /></el-icon>
-                  {{ t("settings.clearTemplates") || "Clear All Templates" }}
+                  {{ t("settings.clearTemplates") }}
                 </el-button>
               </div>
             </el-tab-pane>
@@ -1385,14 +1424,15 @@ const cancelTask = async (taskId: string) => {
   flex: 1;
   min-width: 0;
   position: relative;
+  overflow: hidden;
 }
 
 .map-container {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .panel-section .el-radio-group {

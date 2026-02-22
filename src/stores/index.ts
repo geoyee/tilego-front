@@ -17,12 +17,7 @@ import {
 } from "@/api";
 import i18n from "@/locales";
 import { ElMessage } from "element-plus";
-import {
-  saveSettings,
-  loadSettings,
-  clearSettings,
-  type PersistedSettings,
-} from "@/utils/storage";
+import { saveSettings, loadSettings, clearSettings } from "@/utils/storage";
 
 const t = (key: string) => i18n.global.t(key);
 
@@ -30,6 +25,7 @@ export const useAppStore = defineStore("app", () => {
   const theme = ref<ThemeMode>("light");
   const locale = ref<Locale>("zh-CN");
   const apiBaseUrl = ref<string>("http://localhost:8765");
+  const baseMap = ref<string>("amap");
   const backendConnected = ref(false);
 
   const isDark = computed(() => theme.value === "dark");
@@ -49,6 +45,11 @@ export const useAppStore = defineStore("app", () => {
   const setApiBaseUrl = async (url: string) => {
     apiBaseUrl.value = url;
     await saveSettings({ apiBaseUrl: url });
+  };
+
+  const setBaseMap = async (mapType: string) => {
+    baseMap.value = mapType;
+    await saveSettings({ baseMap: mapType });
   };
 
   const checkBackendConnection = async () => {
@@ -73,6 +74,7 @@ export const useAppStore = defineStore("app", () => {
     theme.value = settings.theme as ThemeMode;
     locale.value = settings.locale as Locale;
     apiBaseUrl.value = settings.apiBaseUrl;
+    baseMap.value = settings.baseMap;
     i18n.global.locale.value = settings.locale as Locale;
     return settings;
   };
@@ -81,11 +83,13 @@ export const useAppStore = defineStore("app", () => {
     theme,
     locale,
     apiBaseUrl,
+    baseMap,
     backendConnected,
     isDark,
     setTheme,
     setAppLocale,
     setApiBaseUrl,
+    setBaseMap,
     checkBackendConnection,
     initTheme,
     loadPersistedSettings,

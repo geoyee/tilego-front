@@ -26,6 +26,7 @@ export interface PersistedSettings {
   batchSize: number;
   bufferSize: number;
   apiBaseUrl: string;
+  baseMap: string;
   theme: string;
   locale: string;
 }
@@ -54,6 +55,7 @@ const DEFAULT_SETTINGS: PersistedSettings = {
   batchSize: 1000,
   bufferSize: 8192,
   apiBaseUrl: "http://localhost:8765",
+  baseMap: "amap",
   theme: "light",
   locale: "zh-CN",
 };
@@ -73,7 +75,7 @@ const openDB = (): Promise<IDBDatabase> => {
 };
 
 export const saveSettings = async (
-  settings: Partial<PersistedSettings>,
+  settings: Partial<PersistedSettings>
 ): Promise<void> => {
   const db = await openDB();
   return new Promise((resolve, reject) => {

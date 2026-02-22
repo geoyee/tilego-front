@@ -98,6 +98,9 @@ export default {
     clearTemplates: "Clear All Templates",
     connected: "Connected",
     disconnected: "Disconnected",
+    baseMap: "Base map selection",
+    amapBase: "Amap Street Map",
+    osmBase: "Open Street Map",
   },
   message: {
     taskCreated: "Task created successfully",

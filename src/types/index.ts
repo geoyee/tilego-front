@@ -6,7 +6,7 @@ export interface BoundingBox {
 }
 
 export interface DownloadParams {
-  id: string;
+  id?: string;
   url_template: string;
   min_lon: number;
   min_lat: number;

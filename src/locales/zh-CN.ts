@@ -97,6 +97,9 @@ export default {
     clearTemplates: "清除所有模板",
     connected: "已连接",
     disconnected: "未连接",
+    baseMap: "底图选择",
+    amapBase: "高德街道地图",
+    osmBase: "开放街道地图",
   },
   message: {
     taskCreated: "任务创建成功",
