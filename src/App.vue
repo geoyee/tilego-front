@@ -34,7 +34,7 @@ interface UrlTemplate {
   createdAt: number;
 }
 
-const DB_NAME = "TileGoDB";
+const DB_NAME = "TileGoTemplates";
 const DB_VERSION = 1;
 const STORE_NAME = "templates";
 
@@ -153,7 +153,7 @@ const newTemplateName = ref("");
 const urlTemplate = ref("");
 const minZoom = ref(0);
 const maxZoom = ref(18);
-const saveDir = ref("./tiles");
+const fileName = ref("tiles");
 const format = ref("zxy");
 const threads = ref(10);
 const timeout = ref(60);
@@ -422,7 +422,7 @@ const startDownload = async () => {
     max_lat: box.maxLat,
     min_zoom: minZoom.value,
     max_zoom: maxZoom.value,
-    save_dir: saveDir.value,
+    save_dir: fileName.value,
     format: format.value,
     threads: threads.value,
     timeout: timeout.value,
@@ -580,6 +580,8 @@ watch(activeTab, (tab) => {
 onMounted(async () => {
   initMap();
   loadTemplates();
+  await appStore.loadPersistedSettings();
+  await settingsStore.loadSavedParams();
   loadSavedSettings();
   appStore.initTheme();
   apiBaseUrl.value = appStore.apiBaseUrl;
@@ -604,7 +606,7 @@ const loadSavedSettings = () => {
 
   minZoom.value = params.min_zoom ?? 0;
   maxZoom.value = params.max_zoom ?? 18;
-  saveDir.value = params.save_dir ?? "./tiles";
+  fileName.value = params.save_dir ?? "tiles";
   format.value = params.format ?? "zxy";
   threads.value = params.threads ?? 10;
   timeout.value = params.timeout ?? 60;
@@ -645,7 +647,7 @@ const capitalize = (str: string): string => {
 
 const formatSpeed = (bytesPerSecond: number): string => {
   if (bytesPerSecond < 1024) {
-    return `${bytesPerSecond} B/s`;
+    return `${bytesPerSecond.toFixed(2)} B/s`;
   } else if (bytesPerSecond < 1024 * 1024) {
     return `${(bytesPerSecond / 1024).toFixed(2)} KB/s`;
   } else {
@@ -653,16 +655,24 @@ const formatSpeed = (bytesPerSecond: number): string => {
   }
 };
 
-const selectFolder = async () => {
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) {
+    return `${bytes.toFixed(2)} B`;
+  } else if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(2)} KB`;
+  } else if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  } else {
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  }
+};
+
+const cancelTask = async (taskId: string) => {
   try {
-    const dirHandle = await window.showDirectoryPicker();
-    saveDir.value = `./${dirHandle.name}`;
-    ElMessage.info(
-      t("download.folderPathHint") ||
-        "Browser cannot get full path, please modify if needed"
-    );
-  } catch {
-    // User cancelled or browser doesn't support
+    await taskStore.stopTaskAction(taskId);
+    await taskStore.deleteTaskAction(taskId);
+  } catch (error) {
+    console.error("Failed to cancel task:", error);
   }
 };
 </script>
@@ -671,7 +681,7 @@ const selectFolder = async () => {
   <div class="main-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
     <aside class="sidebar">
       <div class="sidebar-header">
-        <span v-if="sidebarCollapsed" class="sidebar-title">TileGo</span>
+        <span v-if="sidebarCollapsed" class="sidebar-title"></span>
         <span v-else class="sidebar-title-expanded">TileGo</span>
         <el-button
           :icon="sidebarCollapsed ? 'Expand' : 'Fold'"
@@ -805,18 +815,12 @@ const selectFolder = async () => {
               </div>
 
               <div class="panel-section">
-                <div class="section-label">{{ t("download.saveDir") }}</div>
-                <div class="save-dir-row">
-                  <el-input
-                    v-model="saveDir"
-                    :placeholder="t('download.saveDirPlaceholder')"
-                    size="small"
-                    style="flex: 1"
-                  />
-                  <el-button size="small" @click="selectFolder">
-                    <el-icon><Folder /></el-icon>
-                  </el-button>
-                </div>
+                <div class="section-label">{{ t("download.fileName") }}</div>
+                <el-input
+                  v-model="fileName"
+                  :placeholder="t('download.fileNamePlaceholder')"
+                  size="small"
+                />
               </div>
 
               <div class="panel-section">
@@ -965,23 +969,32 @@ const selectFolder = async () => {
                     <span>{{ t("task.success") }}: {{ task.success }}</span>
                     <span>{{ t("task.failed") }}: {{ task.failed }}</span>
                     <span>{{ t("task.skipped") }}: {{ task.skipped }}</span>
+                    <span v-if="task.bytes_total > 0"
+                      >{{ t("task.size") }}:
+                      {{ formatBytes(task.bytes_total) }}</span
+                    >
                   </div>
                   <div v-if="task.speed > 0" class="task-speed">
                     {{ t("task.speed") }}: {{ formatSpeed(task.speed) }}
                   </div>
                   <div class="task-actions">
                     <el-button
-                      v-if="task.status === 'running'"
-                      type="warning"
-                      size="small"
-                      @click="taskStore.stopTaskAction(task.id)"
-                    >
-                      <el-icon><VideoPause /></el-icon>
-                      {{ t("task.stop") }}
-                    </el-button>
-                    <el-button
+                      v-if="
+                        task.status === 'running' || task.status === 'pending'
+                      "
                       type="danger"
                       size="small"
+                      style="width: 100%"
+                      @click="cancelTask(task.id)"
+                    >
+                      <el-icon><Close /></el-icon>
+                      {{ t("task.cancel") }}
+                    </el-button>
+                    <el-button
+                      v-else
+                      type="danger"
+                      size="small"
+                      style="width: 100%"
                       @click="taskStore.deleteTaskAction(task.id)"
                     >
                       <el-icon><Delete /></el-icon>
@@ -1086,8 +1099,8 @@ const selectFolder = async () => {
 <style scoped>
 .main-layout {
   display: flex;
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
@@ -1102,8 +1115,8 @@ const selectFolder = async () => {
 }
 
 .main-layout.sidebar-collapsed .sidebar {
-  width: 80px;
-  min-width: 80px;
+  width: 56px;
+  min-width: 56px;
 }
 
 .sidebar-header {
@@ -1190,21 +1203,6 @@ const selectFolder = async () => {
 }
 
 .save-template-row .el-button {
-  min-width: 32px;
-  padding: 0 12px;
-}
-
-.save-dir-row {
-  display: flex;
-  gap: 8px;
-}
-
-.save-dir-row .el-input,
-.save-dir-row .el-button {
-  height: 32px;
-}
-
-.save-dir-row .el-button {
   min-width: 32px;
   padding: 0 12px;
 }
@@ -1354,13 +1352,16 @@ const selectFolder = async () => {
 
 .map-area {
   flex: 1;
+  min-width: 0;
   position: relative;
-  overflow: hidden;
 }
 
 .map-container {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 
 .panel-section .el-radio-group {

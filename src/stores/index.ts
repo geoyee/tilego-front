@@ -17,38 +17,38 @@ import {
 } from "@/api";
 import i18n from "@/locales";
 import { ElMessage } from "element-plus";
+import {
+  saveSettings,
+  loadSettings,
+  clearSettings,
+  type PersistedSettings,
+} from "@/utils/storage";
 
 const t = (key: string) => i18n.global.t(key);
 
 export const useAppStore = defineStore("app", () => {
-  const theme = ref<ThemeMode>(
-    (localStorage.getItem("theme") as ThemeMode) || "light"
-  );
-  const locale = ref<Locale>(
-    (localStorage.getItem("locale") as Locale) || "zh-CN"
-  );
-  const apiBaseUrl = ref<string>(
-    localStorage.getItem("apiBaseUrl") || "http://localhost:8765"
-  );
+  const theme = ref<ThemeMode>("light");
+  const locale = ref<Locale>("zh-CN");
+  const apiBaseUrl = ref<string>("http://localhost:8765");
   const backendConnected = ref(false);
 
   const isDark = computed(() => theme.value === "dark");
 
-  const setTheme = (newTheme: ThemeMode) => {
+  const setTheme = async (newTheme: ThemeMode) => {
     theme.value = newTheme;
-    localStorage.setItem("theme", newTheme);
     document.documentElement.classList.toggle("dark", newTheme === "dark");
+    await saveSettings({ theme: newTheme });
   };
 
-  const setAppLocale = (newLocale: Locale) => {
+  const setAppLocale = async (newLocale: Locale) => {
     locale.value = newLocale;
     i18n.global.locale.value = newLocale;
-    localStorage.setItem("locale", newLocale);
+    await saveSettings({ locale: newLocale });
   };
 
-  const setApiBaseUrl = (url: string) => {
+  const setApiBaseUrl = async (url: string) => {
     apiBaseUrl.value = url;
-    localStorage.setItem("apiBaseUrl", url);
+    await saveSettings({ apiBaseUrl: url });
   };
 
   const checkBackendConnection = async () => {
@@ -68,6 +68,15 @@ export const useAppStore = defineStore("app", () => {
     document.documentElement.classList.toggle("dark", theme.value === "dark");
   };
 
+  const loadPersistedSettings = async () => {
+    const settings = await loadSettings();
+    theme.value = settings.theme as ThemeMode;
+    locale.value = settings.locale as Locale;
+    apiBaseUrl.value = settings.apiBaseUrl;
+    i18n.global.locale.value = settings.locale as Locale;
+    return settings;
+  };
+
   return {
     theme,
     locale,
@@ -79,6 +88,7 @@ export const useAppStore = defineStore("app", () => {
     setApiBaseUrl,
     checkBackendConnection,
     initTheme,
+    loadPersistedSettings,
   };
 });
 
@@ -207,7 +217,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const defaultParams = ref<Partial<DownloadParams>>({
     min_zoom: 0,
     max_zoom: 18,
-    save_dir: "./tiles",
+    save_dir: "tiles",
     format: "zxy",
     threads: 10,
     timeout: 60,
@@ -227,26 +237,60 @@ export const useSettingsStore = defineStore("settings", () => {
     buffer_size: 8192,
   });
 
-  const loadSavedParams = () => {
-    const saved = localStorage.getItem("downloadParams");
-    if (saved) {
-      try {
-        defaultParams.value = { ...defaultParams.value, ...JSON.parse(saved) };
-      } catch (e) {
-        console.error("Failed to load saved params:", e);
-      }
-    }
+  const loadSavedParams = async () => {
+    const settings = await loadSettings();
+    defaultParams.value = {
+      min_zoom: settings.minZoom,
+      max_zoom: settings.maxZoom,
+      save_dir: settings.fileName,
+      format: settings.format,
+      threads: settings.threads,
+      timeout: settings.timeout,
+      retries: settings.retries,
+      proxy_url: settings.proxyUrl,
+      user_agent: settings.userAgent,
+      referer: settings.referer,
+      skip_existing: settings.skipExisting,
+      check_md5: settings.checkMd5,
+      min_file_size: settings.minFileSize,
+      max_file_size: settings.maxFileSize,
+      rate_limit: settings.rateLimit,
+      use_http2: settings.useHttp2,
+      keep_alive: settings.keepAlive,
+      batch_size: settings.batchSize,
+      buffer_size: settings.bufferSize,
+    };
   };
 
-  const saveParams = () => {
-    localStorage.setItem("downloadParams", JSON.stringify(defaultParams.value));
+  const saveParamsToStorage = async () => {
+    await saveSettings({
+      minZoom: defaultParams.value.min_zoom,
+      maxZoom: defaultParams.value.max_zoom,
+      fileName: defaultParams.value.save_dir,
+      format: defaultParams.value.format,
+      threads: defaultParams.value.threads,
+      timeout: defaultParams.value.timeout,
+      retries: defaultParams.value.retries,
+      proxyUrl: defaultParams.value.proxy_url,
+      userAgent: defaultParams.value.user_agent,
+      referer: defaultParams.value.referer,
+      skipExisting: defaultParams.value.skip_existing,
+      checkMd5: defaultParams.value.check_md5,
+      minFileSize: defaultParams.value.min_file_size,
+      maxFileSize: defaultParams.value.max_file_size,
+      rateLimit: defaultParams.value.rate_limit,
+      useHttp2: defaultParams.value.use_http2,
+      keepAlive: defaultParams.value.keep_alive,
+      batchSize: defaultParams.value.batch_size,
+      bufferSize: defaultParams.value.buffer_size,
+    });
   };
 
-  const resetParams = () => {
+  const resetParams = async () => {
     defaultParams.value = {
       min_zoom: 0,
       max_zoom: 18,
-      save_dir: "./tiles",
+      save_dir: "tiles",
       format: "zxy",
       threads: 10,
       timeout: 60,
@@ -265,13 +309,13 @@ export const useSettingsStore = defineStore("settings", () => {
       batch_size: 1000,
       buffer_size: 8192,
     };
-    localStorage.removeItem("downloadParams");
+    await clearSettings();
   };
 
   return {
     defaultParams,
     loadSavedParams,
-    saveParams,
+    saveParamsToStorage,
     resetParams,
   };
 });
