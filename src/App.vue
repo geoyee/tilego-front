@@ -679,17 +679,6 @@ const formatNumber = (num: number): number => {
   return Math.round(num);
 };
 
-const getDisplayProgress = (task: {
-  progress: number;
-  total: number;
-  status: string;
-}): number => {
-  if (task.status === "complete") {
-    return task.total;
-  }
-  return Math.min(task.progress, task.total);
-};
-
 const cancelTask = async (taskId: string) => {
   try {
     await taskStore.stopTaskAction(taskId);
@@ -979,18 +968,7 @@ const cancelTask = async (taskId: string) => {
                   </div>
                   <div class="task-progress">
                     <el-progress
-                      :percentage="
-                        task.status === 'complete'
-                          ? 100
-                          : task.total > 0
-                          ? Math.min(
-                              100,
-                              Math.round(
-                                (getDisplayProgress(task) / task.total) * 100
-                              )
-                            )
-                          : 0
-                      "
+                      :percentage="task.progress"
                       :status="
                         task.status === 'complete'
                           ? 'success'
@@ -1004,9 +982,11 @@ const cancelTask = async (taskId: string) => {
                   <div class="task-stats">
                     <span
                       >{{ t("task.progress") }}:
-                      {{ formatNumber(getDisplayProgress(task)) }}/{{
-                        formatNumber(task.total)
-                      }}</span
+                      {{
+                        formatNumber(task.success) +
+                        formatNumber(task.failed) +
+                        formatNumber(task.skipped)
+                      }}/{{ formatNumber(task.total) }}</span
                     >
                     <span
                       >{{ t("task.success") }}:
