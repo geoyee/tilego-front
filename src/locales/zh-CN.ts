@@ -106,6 +106,7 @@ export default {
     connectionFailed: "后端服务连接失败",
     invalidUrl: "请输入有效的 URL 模板",
     invalidRange: "请选择有效的下载范围",
+    invalidCoordinates: "经纬度范围无效，最小值和最大值不能相同",
     fileLoadSuccess: "文件加载成功",
     fileLoadFailed: "文件加载失败",
     confirmDelete: "确定要删除吗？",

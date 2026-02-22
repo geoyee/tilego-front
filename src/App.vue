@@ -414,6 +414,14 @@ const startDownload = async () => {
 
   const box = mapStore.boundingBox;
 
+  if (box.minLon === box.maxLon || box.minLat === box.maxLat) {
+    ElMessage.warning(
+      t("message.invalidCoordinates") ||
+        "经纬度范围无效，最小值和最大值不能相同"
+    );
+    return;
+  }
+
   const params: DownloadParams = {
     url_template: urlTemplate.value,
     min_lon: box.minLon,
@@ -667,6 +675,21 @@ const formatBytes = (bytes: number): string => {
   }
 };
 
+const formatNumber = (num: number): number => {
+  return Math.round(num);
+};
+
+const getDisplayProgress = (task: {
+  progress: number;
+  total: number;
+  status: string;
+}): number => {
+  if (task.status === "complete") {
+    return task.total;
+  }
+  return Math.min(task.progress, task.total);
+};
+
 const cancelTask = async (taskId: string) => {
   try {
     await taskStore.stopTaskAction(taskId);
@@ -796,6 +819,8 @@ const cancelTask = async (taskId: string) => {
                     v-model="minZoom"
                     :min="0"
                     :max="22"
+                    :precision="0"
+                    :step="1"
                     size="small"
                     style="width: 80px"
                   />
@@ -804,6 +829,8 @@ const cancelTask = async (taskId: string) => {
                     v-model="maxZoom"
                     :min="0"
                     :max="22"
+                    :precision="0"
+                    :step="1"
                     size="small"
                     style="width: 80px"
                   />
@@ -844,6 +871,8 @@ const cancelTask = async (taskId: string) => {
                         v-model="threads"
                         :min="1"
                         :max="100"
+                        :precision="0"
+                        :step="1"
                         size="small"
                       />
                     </div>
@@ -853,6 +882,8 @@ const cancelTask = async (taskId: string) => {
                         v-model="timeout"
                         :min="1"
                         :max="300"
+                        :precision="0"
+                        :step="1"
                         size="small"
                       />
                     </div>
@@ -862,6 +893,8 @@ const cancelTask = async (taskId: string) => {
                         v-model="retries"
                         :min="0"
                         :max="20"
+                        :precision="0"
+                        :step="1"
                         size="small"
                       />
                     </div>
@@ -873,6 +906,8 @@ const cancelTask = async (taskId: string) => {
                         v-model="rateLimit"
                         :min="1"
                         :max="100"
+                        :precision="0"
+                        :step="1"
                         size="small"
                       />
                     </div>
@@ -938,7 +973,7 @@ const cancelTask = async (taskId: string) => {
                   class="task-item"
                 >
                   <div class="task-header-row">
-                    <span class="task-id">{{ task.id.slice(0, 8) }}</span>
+                    <span class="task-id">{{ task.id }}</span>
                     <el-tag :type="getTaskStatusType(task.status)" size="small">
                       {{ t(`task.status${capitalize(task.status)}`) }}
                     </el-tag>
@@ -946,8 +981,15 @@ const cancelTask = async (taskId: string) => {
                   <div class="task-progress">
                     <el-progress
                       :percentage="
-                        task.total > 0
-                          ? Math.round((task.progress / task.total) * 100)
+                        task.status === 'complete'
+                          ? 100
+                          : task.total > 0
+                          ? Math.min(
+                              100,
+                              Math.round(
+                                (getDisplayProgress(task) / task.total) * 100
+                              )
+                            )
                           : 0
                       "
                       :status="
@@ -962,13 +1004,23 @@ const cancelTask = async (taskId: string) => {
                   </div>
                   <div class="task-stats">
                     <span
-                      >{{ t("task.progress") }}: {{ task.progress }}/{{
-                        task.total
+                      >{{ t("task.progress") }}:
+                      {{ formatNumber(getDisplayProgress(task)) }}/{{
+                        formatNumber(task.total)
                       }}</span
                     >
-                    <span>{{ t("task.success") }}: {{ task.success }}</span>
-                    <span>{{ t("task.failed") }}: {{ task.failed }}</span>
-                    <span>{{ t("task.skipped") }}: {{ task.skipped }}</span>
+                    <span
+                      >{{ t("task.success") }}:
+                      {{ formatNumber(task.success) }}</span
+                    >
+                    <span
+                      >{{ t("task.failed") }}:
+                      {{ formatNumber(task.failed) }}</span
+                    >
+                    <span
+                      >{{ t("task.skipped") }}:
+                      {{ formatNumber(task.skipped) }}</span
+                    >
                     <span v-if="task.bytes_total > 0"
                       >{{ t("task.size") }}:
                       {{ formatBytes(task.bytes_total) }}</span

@@ -107,6 +107,8 @@ export default {
     connectionFailed: "Backend service connection failed",
     invalidUrl: "Please enter a valid URL template",
     invalidRange: "Please select a valid download range",
+    invalidCoordinates:
+      "Invalid coordinates: min and max values cannot be the same",
     fileLoadSuccess: "File loaded successfully",
     fileLoadFailed: "Failed to load file",
     confirmDelete: "Are you sure you want to delete?",
