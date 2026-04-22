@@ -383,6 +383,7 @@ const loadFile = async () => {
 const formatOptions = [
   { value: "zxy", label: "Z/X/Y" },
   { value: "xyz", label: "X/Y/Z" },
+  { value: "zyx", label: "Z/Y/X" },
 ];
 
 const estimatedTiles = computed(() => {
