@@ -78,6 +78,7 @@ export default {
     statusRunning: "Running",
     statusStopped: "Stopped",
     statusComplete: "Complete",
+    statusComplete_partial: "Partial Complete",
     statusFailed: "Failed",
   },
   settings: {

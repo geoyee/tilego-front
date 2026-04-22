@@ -70,6 +70,12 @@ const DEFAULT_TEMPLATES: UrlTemplate[] = [
     url: "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
     createdAt: 0,
   },
+  {
+    id: "default-google-en",
+    name: "Google English",
+    url: "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+    createdAt: 0,
+  },
 ];
 
 const openDB = (): Promise<IDBDatabase> => {

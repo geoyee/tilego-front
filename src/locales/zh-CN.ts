@@ -77,6 +77,7 @@ export default {
     statusRunning: "运行中",
     statusStopped: "已停止",
     statusComplete: "已完成",
+    statusComplete_partial: "部分完成",
     statusFailed: "失败",
   },
   settings: {
